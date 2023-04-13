@@ -1,5 +1,11 @@
 from django.contrib import admin
 from .models import *
 
-# TODO: BlogAdmin 변경, Comment 등록, Tag 등록
-admin.site.register(Blog)
+
+class BlogAdmin(admin.ModelAdmin):
+    filter_horizontal = ('tag',)
+
+
+admin.site.register(Blog, BlogAdmin)
+admin.site.register(Comment)
+admin.site.register(Tag)

@@ -1,7 +1,6 @@
-from django.shortcuts import render,get_object_or_404,redirect
 from django.core.paginator import Paginator
-from .models import Blog
-from .forms import BlogForm
+from django.shortcuts import render, get_object_or_404, redirect
+from .models import Blog, Comment, Tag, Like
 
 
 def home(request):
@@ -9,37 +8,47 @@ def home(request):
     paginator = Paginator(blogs, 3)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    return render(request,'home.html',{'page_obj':page_obj})
+    return render(request, 'home.html', {'page_obj': page_obj})
+
 
 def detail(request, blog_id):
     blog = get_object_or_404(Blog, pk=blog_id)
-    # TODO: Comment 추가
+    comments = Comment.objects.filter(blog=blog) 
+    tags = blog.tag.all()
+    likes = len(Like.objects.filter(blog=blog)) 
+    return render(request, 'detail.html', {'blog': blog, 'comments': comments, 'tags': tags, 'likes': likes})
 
-    # TODO: Tag 추가
-    return render(request,'detail.html',{'blog':blog})
 
 def new(request):
-    # TODO: Tag 추가
-    return render(request,'new.html')
+    tags = Tag.objects.all()
+    return render(request, 'new.html', {'tags': tags})
+
 
 def create(request):
     new_blog = Blog()
     new_blog.title = request.POST.get('title')
     new_blog.content = request.POST.get('content')
     new_blog.image = request.FILES.get('image')
-    # TODO: author 추가
+    new_blog.author = request.user
 
     new_blog.save()
+    tags = request.POST.getlist('tags')
 
-    # TODO: tags 추가
+    for tag_id in tags:
+        tag = Tag.objects.get(id=tag_id)
+        new_blog.tag.add(tag)
+
     return redirect('detail', new_blog.id)
 
+
 def edit(request, blog_id):
-    edit_blog = get_object_or_404(Blog, pk=blog_id)
+    edit_blog = Blog.objects.get(id=blog_id)
+    tags = Tag.objects.all()
 
-    # TODO: 본인이 쓴 글이 아니면 home으로 redirect
+    if request.user != edit_blog.author:
+        return redirect('detail', edit_blog.id)
 
-    return render(request, 'edit.html', {'edit_blog':edit_blog})
+    return render(request, 'edit.html', {'edit_blog': edit_blog, 'tags':tags})
 
 
 def update(request, blog_id):
@@ -48,24 +57,49 @@ def update(request, blog_id):
     old_blog.content = request.POST.get('content')
     old_blog.image = request.FILES.get('image')
     old_blog.save()
+
+    old_blog.tag.clear() 
+    tags = request.POST.getlist('tags')
+    for tag_id in tags:
+        tag = get_object_or_404(Tag, pk=tag_id)
+        old_blog.tag.add(tag)
+
     return redirect('detail', old_blog.id)
-
-# def update(request, blog_id):
-#     old_blog = get_object_or_404(Blog, pk=blog_id)
-#     form = BlogForm(request.POST, instance=old_blog)
-
-    # 클라이언트가 유효한 값을 입력한 경우
-    if form.is_valid():
-        new_blog = form.save(commit=False)
-        new_blog.save()
-        return redirect('detail', old_blog.id)
-
-    return render(request, 'new.html', {'old_blog':old_blog})
 
 
 def delete(request, blog_id):
     delete_blog = get_object_or_404(Blog, pk=blog_id)
-    delete_blog.delete()
-    return redirect('home')
+    if request.user == delete_blog.author:
+        delete_blog.delete()
+        return redirect('home')
+    return redirect('detail', delete_blog.id)
 
-# TODO: new_comment, create_comment 추가
+
+
+def new_comment(request, blog_id):
+    if request.user.is_anonymous:
+        return redirect('singin')
+    blog = get_object_or_404(Blog, pk=blog_id)
+    return render(request, 'new_comment.html', {'blog': blog})
+
+
+
+def create_comment(request, blog_id):
+    comment = Comment()
+    comment.content = request.POST.get('content')
+    comment.blog = get_object_or_404(Blog, pk=blog_id)
+    comment.author = request.user
+    comment.save()
+    return redirect('detail', blog_id)
+
+
+def like(request, blog_id):
+    if request.user.is_anonymous:
+        return redirect('login')
+    if Like.objects.filter(likedUser=request.user, blog_id=blog_id):
+        return redirect('detail', blog_id)
+    like = Like()
+    like.blog = get_object_or_404(Blog, pk=blog_id)
+    like.likedUser = request.user
+    like.save()
+    return redirect('detail', blog_id)

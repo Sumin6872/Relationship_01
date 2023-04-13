@@ -2,6 +2,12 @@ from django.urls import path
 from .views import *
 
 
+app_name = 'users'
+
 urlpatterns = [
-    #TODO: 로그인, 회원가입, 로그아웃 url 추가
+    path('signin/', signin, name='signin'),
+    path('signup/', signup, name='signup'),
+    path('signout/', signout, name='signout'),
+    path('new_profile/', new_profile, name='new_profile'),
+    path('create_profile/', create_profile, name='create_profile'),
 ]
